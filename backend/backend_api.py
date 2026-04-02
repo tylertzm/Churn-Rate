@@ -1,9 +1,12 @@
-from fastapi import FastAPI, HTTPException
 import os
 import json
 import pandas as pd
+from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
+
+# Use absolute path for the results file relative to this file's directory
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
 # Modular imports for the data pipeline
 from scraping.trustpilot import scrape
@@ -24,8 +27,6 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Use absolute path for the results file relative to this file's directory
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 ADDED_CHURN_CSV = os.path.join(BASE_DIR, "statistics", "reviews_churn_added.csv")
 
 @app.get("/api/churn/run")
