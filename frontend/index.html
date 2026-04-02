@@ -47,8 +47,8 @@
                 if (isManual) setRefreshing(true);
                 try {
                     // Analysis is run automatically by the backend on this call
-                    await fetch('http://localhost:8000/api/churn/run'); 
-                    const response = await fetch('http://localhost:8000/api/churn/results');
+                    await fetch('/api/churn/run'); 
+                    const response = await fetch('/api/churn/results');
                     const json = await response.json();
                     setData(json);
                 } catch (err) {

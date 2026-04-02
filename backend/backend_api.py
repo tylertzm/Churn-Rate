@@ -3,6 +3,7 @@ import os
 import json
 import pandas as pd
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 
 # Modular imports for the data pipeline
 from scraping.trustpilot import scrape
@@ -10,6 +11,9 @@ from preprocessing import cleaning
 from statistics import churn_rate
 
 app = FastAPI(title="SumUp Churn Monitor API")
+
+# Mount static files for frontend
+app.mount("/", StaticFiles(directory=os.path.join(BASE_DIR, "..", "frontend"), html=True), name="frontend")
 
 # Enable CORS
 app.add_middleware(
