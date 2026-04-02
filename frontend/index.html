@@ -46,8 +46,10 @@
             const fetchData = async (isManual = false) => {
                 if (isManual) setRefreshing(true);
                 try {
-                    // Analysis is run automatically by the backend on this call
-                    await fetch('/api/churn/run'); 
+                    if (isManual) {
+                        // Only run the pipeline when manually refreshing
+                        await fetch('/api/churn/run');
+                    }
                     const response = await fetch('/api/churn/results');
                     const json = await response.json();
                     setData(json);
