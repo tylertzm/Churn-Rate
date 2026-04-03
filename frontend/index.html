@@ -42,6 +42,12 @@
             });
             const [loading, setLoading] = useState(true);
             const [refreshing, setRefreshing] = useState(false);
+            const [chatOpen, setChatOpen] = useState(false);
+            const [messages, setMessages] = useState([
+                { role: 'assistant', content: 'Hello! I\'m your churn analysis assistant. How can I help you today?' }
+            ]);
+            const [inputMessage, setInputMessage] = useState('');
+            const [sessionId, setSessionId] = useState(null);
 
             const fetchData = async (isManual = false) => {
                 if (isManual) setRefreshing(true);
@@ -109,6 +115,57 @@
                 if (mins < 60) return `${mins}m ago`;
                 const hours = Math.floor(mins / 60);
                 return `${hours}h ago`;
+            };
+
+            const handleSendMessage = async () => {
+                if (!inputMessage.trim()) return;
+                
+                const userMessage = { role: 'user', content: inputMessage };
+                setMessages(prev => [...prev, userMessage]);
+                const messageText = inputMessage;
+                setInputMessage('');
+                
+                // Add thinking indicator
+                const thinkingMessage = { role: 'assistant', content: '...' };
+                setMessages(prev => [...prev, thinkingMessage]);
+                
+                try {
+                    const response = await fetch('http://localhost:8000/api/chat', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ 
+                            message: messageText,
+                            session_id: sessionId 
+                        })
+                    });
+                    
+                    const data = await response.json();
+                    
+                    // Store session ID for conversation continuity
+                    if (data.session_id) {
+                        setSessionId(data.session_id);
+                    }
+                    
+                    // Replace thinking message with actual response
+                    setMessages(prev => {
+                        const newMessages = [...prev];
+                        newMessages[newMessages.length - 1] = {
+                            role: 'assistant',
+                            content: data.answer || 'I received your question but couldn\'t generate a response.'
+                        };
+                        return newMessages;
+                    });
+                } catch (error) {
+                    console.error('Chat error:', error);
+                    setMessages(prev => {
+                        const newMessages = [...prev];
+                        newMessages[newMessages.length - 1] = {
+                            role: 'assistant',
+                            content: 'Sorry, I encountered an error. Please make sure the analysis has been run and the chatbot is initialized.'
+                        };
+                        return newMessages;
+                    });
+                }
             };
 
             return (
@@ -211,15 +268,6 @@
                                         <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Review Events (6mo)</p>
                                     </div>
                                 </div>
-                                <div className="pt-6 border-t border-slate-50 mt-4">
-                                    <div className="flex justify-between items-center text-xs mb-2">
-                                        <span className="text-slate-400">Analysis Confidence</span>
-                                        <span className="font-bold text-slate-700">92%</span>
-                                    </div>
-                                    <div className="w-full h-1 bg-slate-50 rounded-full overflow-hidden">
-                                        <div className="w-[92%] h-full bg-[#0066FF]" />
-                                    </div>
-                                </div>
                             </div>
 
                             {/* Outreach Priority */}
@@ -318,6 +366,87 @@
                             </div>
 
                         </main>
+                        </div>
+
+                        {/* Chatbot Widget */}
+                        <div className="fixed bottom-6 right-6 z-50">
+                            {/* Chat Window */}
+                            {chatOpen && (
+                                <div className="mb-4 w-96 h-[500px] bg-white rounded-xl border border-slate-200 shadow-2xl flex flex-col overflow-hidden">
+                                    {/* Header */}
+                                    <div className="bg-[#0066FF] text-white px-5 py-4 flex items-center justify-between">
+                                        <div className="flex items-center gap-3">
+                                            <div className="w-8 h-8 rounded-full bg-white/20 flex items-center justify-center">
+                                                <Icon name="bot" size={16} />
+                                            </div>
+                                            <div>
+                                                <h3 className="text-sm font-bold">Churn Assistant</h3>
+                                                <p className="text-[10px] opacity-75">AI-powered insights</p>
+                                            </div>
+                                        </div>
+                                        <button 
+                                            onClick={() => setChatOpen(false)}
+                                            className="p-1 hover:bg-white/20 rounded-lg transition-colors"
+                                        >
+                                            <Icon name="x" size={16} />
+                                        </button>
+                                    </div>
+                                    
+                                    {/* Messages */}
+                                    <div className="flex-1 overflow-y-auto p-4 space-y-3 bg-slate-50">
+                                        {messages.map((msg, idx) => (
+                                            <div 
+                                                key={idx} 
+                                                className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
+                                            >
+                                                <div 
+                                                    className={`max-w-[80%] px-4 py-2 rounded-xl text-sm ${
+                                                        msg.role === 'user' 
+                                                            ? 'bg-[#0066FF] text-white' 
+                                                            : 'bg-white border border-slate-200 text-slate-700'
+                                                    }`}
+                                                >
+                                                    {msg.content}
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                    
+                                    {/* Input */}
+                                    <div className="p-4 bg-white border-t border-slate-200">
+                                        <div className="flex gap-2">
+                                            <input
+                                                type="text"
+                                                value={inputMessage}
+                                                onChange={(e) => setInputMessage(e.target.value)}
+                                                onKeyPress={(e) => e.key === 'Enter' && handleSendMessage()}
+                                                placeholder="Ask about churn insights..."
+                                                className="flex-1 px-4 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0066FF] focus:border-transparent"
+                                            />
+                                            <button
+                                                onClick={handleSendMessage}
+                                                className="px-4 py-2 bg-[#0066FF] text-white rounded-lg hover:bg-[#0052CC] transition-colors"
+                                            >
+                                                <Icon name="send" size={16} />
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+                            
+                            {/* Floating Button */}
+                            <button
+                                onClick={() => setChatOpen(!chatOpen)}
+                                className="w-14 h-14 rounded-full shadow-2xl flex items-center justify-center transition-all hover:scale-110 overflow-hidden"
+                            >
+                                {chatOpen ? (
+                                    <div className="bg-slate-800 w-full h-full flex items-center justify-center">
+                                        <Icon name="x" size={24} className="text-white" />
+                                    </div>
+                                ) : (
+                                    <img src="chatbot.png" alt="Chat" className="w-full h-full object-cover" />
+                                )}
+                            </button>
                         </div>
 
 

@@ -4,6 +4,8 @@ import pandas as pd
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
+from pydantic import BaseModel
+from typing import Optional
 
 # Use absolute path for the results file relative to this file's directory
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -12,6 +14,7 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 from scraping.trustpilot import scrape
 from preprocessing import cleaning
 from statistics import churn_rate
+from chatbot import get_chatbot
 
 app = FastAPI(title="SumUp Churn Monitor API")
 
@@ -24,7 +27,26 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Request models
+class ChatRequest(BaseModel):
+    message: str
+    session_id: Optional[str] = None  # Optional session ID for conversation continuity
+
 ADDED_CHURN_CSV = os.path.join(BASE_DIR, "statistics", "reviews_churn_added.csv")
+
+# Initialize chatbot (lazy loading)
+chatbot = None
+
+def get_or_create_chatbot():
+    global chatbot
+    if chatbot is None:
+        try:
+            chatbot = get_chatbot()
+        except Exception as e:
+            print(f"WARNING: Could not initialize chatbot: {e}")
+            print("The API will continue to run, but the chat endpoint will return errors.")
+            chatbot = None  # Set to None so we can retry later
+    return chatbot
 
 @app.get("/api/churn/run")
 async def run_full_pipeline():
@@ -84,6 +106,34 @@ async def get_churn_results():
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error reading results: {e}")
+
+@app.post("/api/chat")
+async def chat_with_bot(request: ChatRequest):
+    """Query the chatbot with RAG-powered LLM responses and conversation history."""
+    try:
+        bot = get_or_create_chatbot()
+        
+        if bot is None:
+            raise HTTPException(
+                status_code=503, 
+                detail="Chatbot service is unavailable. The vector database may need to be initialized. Run: python backend/RAG/ingestion.py"
+            )
+        
+        result = bot.chat(request.message, session_id=request.session_id)
+        
+        if result["status"] == "error":
+            raise HTTPException(status_code=500, detail=result["answer"])
+        
+        return {
+            "answer": result["answer"],
+            "sources_count": result.get("sources_count", 0),
+            "session_id": result.get("session_id"),
+            "history_length": result.get("history_length", 0)
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Chatbot error: {str(e)}")
 
 # Mount static files for frontend (after routes to avoid conflicts)
 app.mount("/", StaticFiles(directory=os.path.join(BASE_DIR, "..", "frontend"), html=True), name="frontend")
