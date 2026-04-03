@@ -9,5 +9,4 @@ accelerate
 chromadb
 openai
 sentence-transformers
-psycopg2
 psycopg2-binary
