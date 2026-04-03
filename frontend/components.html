@@ -58,7 +58,8 @@
                 'alert-triangle': '<path d="m21.73 18-8-14a2 2 0 0 0-3.46 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"/><path d="M12 9v4"/><path d="M12 17h.01"/>',
                 'chevron-up': '<path d="m18 15-6-6-6 6"/>',
                 'chevron-down': '<path d="m6 9 6 6 6-6"/>',
-                'search': '<circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/>'
+                'search': '<circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/>',
+                'x': '<path d="M18 6 6 18"/><path d="m6 6 12 12"/>'
             };
             return icons[name] || '';
         };
@@ -69,6 +70,17 @@
             const [error, setError] = useState(null);
             const [filters, setFilters] = useState({});
             const [sortConfig, setSortConfig] = useState({ key: null, direction: 'asc' });
+            const [activeTab, setActiveTab] = useState('review');
+            const [expandedCell, setExpandedCell] = useState(null);
+
+            // Column groups
+            const columnGroups = {
+                review: { label: 'Review Info', columns: ['rating', 'title', 'body'] },
+                timeline: { label: 'Timeline', columns: ['date', 'date_raw'] },
+                analysis: { label: 'Analysis', columns: ['issue_list', 'is_business', 'churn_score', 'churn_risk_level'] }
+            };
+
+            const fixedColumn = 'name';
 
             useEffect(() => {
                 fetchData();
@@ -143,6 +155,22 @@
 
             const filteredData = getFilteredAndSortedData();
 
+            const getVisibleColumns = () => {
+                return [fixedColumn, ...columnGroups[activeTab].columns];
+            };
+
+            const formatCellValue = (value, maxLength = 40) => {
+                const strValue = String(value);
+                if (strValue.length > maxLength) {
+                    return strValue.substring(0, maxLength) + '...';
+                }
+                return strValue;
+            };
+
+            const handleCellClick = (rowIndex, columnKey, fullValue) => {
+                setExpandedCell({ rowIndex, columnKey, value: fullValue });
+            };
+
             if (loading) {
                 return (
                     <div className="min-h-screen flex items-center justify-center bg-slate-50">
@@ -213,10 +241,7 @@
                                                 <Icon name="database" size={16} />
                                                 </div>
                                                 <div>
-                                                    <h2 className="text-xs font-bold uppercase tracking-wider text-slate-400">
-                                                        Analyzed Reviews Registry
-                                                    </h2>
-                                                    <p className="text-[10px] text-slate-400 mt-0.5">
+                                                    <p className="text-[10px] text-slate-400">
                                                         Showing {filteredData.length} of {data.length} reviews
                                                     </p>
                                                 </div>
@@ -230,12 +255,34 @@
                                         </div>
                                     </div>
 
+                                    {/* Tab Navigation */}
+                                    <div className="flex gap-2 mt-4">
+                                        {Object.entries(columnGroups).map(([key, group]) => (
+                                            <button
+                                                key={key}
+                                                onClick={() => setActiveTab(key)}
+                                                className={`px-4 py-2 text-[10px] font-bold uppercase tracking-widest rounded-lg transition-all ${
+                                                    activeTab === key
+                                                        ? 'bg-[#0066FF] text-white shadow-sm'
+                                                        : 'bg-slate-100 text-slate-500 hover:bg-slate-200'
+                                                }`}
+                                            >
+                                                {group.label}
+                                            </button>
+                                        ))}
+                                    </div>
+
                                     <div className="overflow-auto flex-1">
                                         <table className="min-w-full divide-y divide-slate-100">
-                                            <thead className="bg-slate-50 sticky top-0 z-10">
+                                            <thead className="bg-slate-50">
                                                 <tr>
-                                                    {data.length > 0 && Object.keys(data[0]).map(key => (
-                                                        <th key={key} className="px-4 py-2 text-left border-b border-slate-200 bg-slate-50">
+                                                    <th className="px-4 py-2 text-left border-b border-slate-200 bg-slate-50 sticky top-0 left-0 z-30 shadow-sm w-16">
+                                                        <div className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">
+                                                            #
+                                                        </div>
+                                                    </th>
+                                                    {data.length > 0 && getVisibleColumns().map(key => (
+                                                        <th key={key} className={`px-4 py-2 text-left border-b border-slate-200 bg-slate-50 ${key === fixedColumn ? 'sticky top-0 left-16 z-30 shadow-sm' : 'sticky top-0 z-20'}`}>
                                                             <div className="flex flex-col gap-1">
                                                                 <button
                                                                     onClick={() => handleSort(key)}
@@ -262,19 +309,30 @@
                                                 </tr>
                                             </thead>
                                             <tbody className="bg-white divide-y divide-slate-50">
-                                                {filteredData.map((item, index) => (
-                                                    <tr key={index} className="hover:bg-slate-50/50 transition-colors">
-                                                        {Object.values(item).map((value, i) => (
-                                                            <td key={i} className="px-4 py-3 text-[11px] text-slate-700 font-medium">
-                                                                {typeof value === 'boolean' ? (
-                                                                    <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[9px] font-bold ${value ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-600'}`}>
-                                                                        {value ? 'Yes' : 'No'}
-                                                                    </span>
-                                                                ) : (
-                                                                    <span className="truncate block max-w-xs">{String(value)}</span>
-                                                                )}
-                                                            </td>
-                                                        ))}
+                                                {filteredData.map((item, rowIndex) => (
+                                                    <tr key={rowIndex} className="hover:bg-slate-50/50 transition-colors">
+                                                        <td className="px-4 py-3 text-[11px] text-slate-500 font-bold sticky left-0 bg-white z-10 shadow-sm w-16">
+                                                            {rowIndex + 1}
+                                                        </td>
+                                                        {getVisibleColumns().map((key) => {
+                                                            const value = item[key];
+                                                            const isFixed = key === fixedColumn;
+                                                            return (
+                                                                <td 
+                                                                    key={key} 
+                                                                    className={`px-4 py-3 text-[11px] text-slate-700 font-medium cursor-pointer hover:bg-[#0066FF]/5 ${isFixed ? 'sticky left-16 bg-white z-10 shadow-sm' : ''}`}
+                                                                    onClick={() => handleCellClick(rowIndex, key, value)}
+                                                                >
+                                                                    {typeof value === 'boolean' ? (
+                                                                        <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[9px] font-bold ${value ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-600'}`}>
+                                                                            {value ? 'Yes' : 'No'}
+                                                                        </span>
+                                                                    ) : (
+                                                                        <span className="block">{formatCellValue(value)}</span>
+                                                                    )}
+                                                                </td>
+                                                            );
+                                                        })}
                                                     </tr>
                                                 ))}
                                             </tbody>
@@ -302,6 +360,41 @@
                                     )}
                                 </div>
                         </div>
+
+                        {/* Expanded Cell Modal */}
+                        {expandedCell && (
+                            <div 
+                                className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"
+                                onClick={() => setExpandedCell(null)}
+                            >
+                                <div 
+                                    className="bg-white rounded-xl shadow-2xl max-w-2xl w-full max-h-[80vh] overflow-auto"
+                                    onClick={(e) => e.stopPropagation()}
+                                >
+                                    <div className="sticky top-0 bg-slate-50 border-b border-slate-200 px-6 py-4 flex items-center justify-between">
+                                        <div>
+                                            <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400">
+                                                {expandedCell.columnKey.replace(/_/g, ' ')}
+                                            </h3>
+                                            <p className="text-[10px] text-slate-400 mt-0.5">
+                                                Row {expandedCell.rowIndex + 1}
+                                            </p>
+                                        </div>
+                                        <button
+                                            onClick={() => setExpandedCell(null)}
+                                            className="p-2 hover:bg-slate-200 rounded-lg transition-colors"
+                                        >
+                                            <Icon name="x" size={16} />
+                                        </button>
+                                    </div>
+                                    <div className="px-6 py-6">
+                                        <div className="text-sm text-slate-700 font-medium whitespace-pre-wrap break-words">
+                                            {String(expandedCell.value)}
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
 
                     </div>
                 </div>
