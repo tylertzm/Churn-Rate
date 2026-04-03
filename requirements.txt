@@ -3,3 +3,11 @@ uvicorn[standard]
 pandas
 playwright
 dateparser
+torch
+transformers
+accelerate
+chromadb
+openai
+sentence-transformers
+psycopg2
+psycopg2-binary
